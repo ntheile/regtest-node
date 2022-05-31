@@ -3,6 +3,7 @@ FROM debian:bullseye-slim
 ARG HOMEDIR="/root"
 ARG RUNPATH="$HOMEDIR/run"
 ARG LIBPATH="$RUNPATH/lib"
+ARG CLNPATH="$HOMEDIR/.lightning"
 
 ## Install dependencies.
 RUN apt-get update && apt-get install -y \
@@ -41,15 +42,14 @@ RUN rm -rf /tmp/* /var/tmp/*
 #RUN rm -rf /var/lib/apt/lists/*
 
 ## Install sparko binary
-RUN PLUGPATH="$HOMEDIR/.lightning/plugins" && mkdir -p $PLUGPATH \
+RUN PLUGPATH="$CLNPATH/plugins" && mkdir -p $PLUGPATH \
   && curl https://github.com/fiatjaf/sparko/releases/download/v2.9/sparko_linux_amd64 \
   -fsL#o $PLUGPATH/sparko && chmod +x $PLUGPATH/sparko
 
 ## Install RTL REST API.
-# RUN mkdir -p /root/.lightning \
-#   && cd /root/.lightning \
-#   && git clone https://github.com/Ride-The-Lightning/c-lightning-REST.git \
-#   && cd cl-rest && npm install
+RUN PLUGPATH="$CLNPATH/plugins" && mkdir -p $PLUGPATH && cd $PLUGPATH \
+  && git clone https://github.com/Ride-The-Lightning/c-lightning-REST.git cl-rest \
+  && cd cl-rest && npm install
 
 ## Configure user account for Tor.
 # RUN addgroup tor \
@@ -68,16 +68,23 @@ RUN alias_file="~/config/.bash_aliases" \
 ## Make sure scripts are executable.
 RUN for file in `grep -lr '#!/usr/bin/env' $RUNPATH`; do chmod +x $file; done
 
-## Symlink entrypoint to PATH.
-RUN ln -s $RUNPATH/entrypoint.sh /usr/local/bin/start-node
+## Symlink entrypoint and login to PATH.
+RUN ln -s $RUNPATH/entrypoint.sh /usr/local/bin/node-start
 
-## Configure environment.
+## Configure run environment.
 ENV PATH="$LIBPATH/bin:$HOMEDIR/.local/bin:$PATH"
 ENV PYPATH="$LIBPATH/pylib:$PYPATH"
 ENV RUNPATH="$RUNPATH"
 ENV LIBPATH="$LIBPATH"
-ENV PLUGPATH="$RUNPATH/plugins"
+ENV LOGPATH="/var/log"
+ENV CONFPATH="$HOMEDIR/config"
+ENV ONIONPATH="/data/tor/services"
+
+## Configure Core Lightning Environment
+ENV LNPATH="$HOMEDIR/.lightning"
+ENV PLUGPATH="$RUNPATH/plugins/"
+ENV LNRPCPATH="$LNPATH/regtest/lightning-rpc"
 
 WORKDIR $HOMEDIR
 
-ENTRYPOINT [ "start-node" ]
+ENTRYPOINT [ "node-start" ]
